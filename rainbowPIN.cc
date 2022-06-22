@@ -1,18 +1,31 @@
 #include <stdio.h>
 #include <sqlite3.h>
 #include <stdint.h>
+#include <thread>
 
 // per the SQLite docs, "Threads are evil. Avoid them."
 // PRAGMA synchronous=OFF don't wait for fflush
 // INTEGER PRIMARY KEY the PIN 
-
-static int callback(void *NotUsed, int argc, char **argv, char **azColName){
-	int i;
-	for(i=0; i<argc; i++){
-		printf("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
+void hasher(void) {
+	const uint32_t batch = 10;
+	for (uint64_t i = 0; i < 999999999; i += batch) {
+		for (uint32_t j = 0; j < batch; j++) {
+			// queue
+		}
 	}
-	printf("\n");
-	return 0;
+}
+
+void dber(sqlite3 *db) {
+	char *zErrMsg = 0;
+	char sql[1024];
+	uint64_t i; //XXX
+
+	sprintf(sql, "INSERT INTO rainbow VALUES (%ld, \"%lx\");", i, i);
+	int rc = sqlite3_exec(db, sql, NULL, 0, &zErrMsg);
+	if( rc!=SQLITE_OK ){
+		fprintf(stderr, "SQL error: %s\n", zErrMsg);
+		sqlite3_free(zErrMsg);
+	}
 }
 
 int main(int argc, char **argv){
@@ -43,14 +56,9 @@ int main(int argc, char **argv){
 		fprintf(stderr, "SQL error: %s\n", zErrMsg);
 		sqlite3_free(zErrMsg);
 	}
-	for (uint64_t i = 0; i < 999999999; i++) {
-		sprintf(sql, "INSERT INTO rainbow VALUES (%ld, \"%lx\");", i, i);
-		rc = sqlite3_exec(db, sql, NULL, 0, &zErrMsg);
-		if( rc!=SQLITE_OK ){
-			fprintf(stderr, "SQL error: %s\n", zErrMsg);
-			sqlite3_free(zErrMsg);
-		}
-	}
+
+	std::thread hasherThread(hasher);
+	std::thread dberThread(dber(db));
 
 	sqlite3_close(db);
 	return 0;

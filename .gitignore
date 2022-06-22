@@ -1,2 +1,5 @@
 *.swp
 rainbowPIN
+sha256
+*.db*
+*.sqlite

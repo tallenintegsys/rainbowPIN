@@ -1,11 +1,15 @@
 CFLAGS= -g
-LDFLAGS= -lsqlite3
+LDFLAGS= -lsqlite3 -lcrypto
 
 %: %.c
 	$(CC) -o $@ $^ $(LIBS) $(CFLAGS) $(LDFLAGS)
 
+all: rainbowPIN sha256
+
 rainbowPIN:
+
+sha256:
 
 .PHONY: clean
 clean:
-	rm -rf rainbowPIN
+	rm -rf rainbowPIN sha256

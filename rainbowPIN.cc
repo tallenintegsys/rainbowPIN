@@ -2,33 +2,29 @@
 #include <sqlite3.h>
 #include <stdint.h>
 #include <thread>
+#include <deque>
+#include <cstring>
 
 // per the SQLite docs, "Threads are evil. Avoid them."
 // PRAGMA synchronous=OFF don't wait for fflush
 // INTEGER PRIMARY KEY the PIN 
+typedef struct {
+	uint64_t	pin;
+	char		hash[32];
+} hash;
+
+std::deque<hash> queue;
+
 void hasher(void) {
-	const uint32_t batch = 10;
-	for (uint64_t i = 0; i < 999999999; i += batch) {
-		for (uint32_t j = 0; j < batch; j++) {
-			// queue
-		}
+	hash h;
+	for (uint64_t i = 0; i < 9999; i += 10) {
+		h.pin = i;
+		sprintf(h.hash, "1234567890123456789012345678901"); //XXX BS placeholder
+		queue.push_back(h);
 	}
 }
 
-void dber(sqlite3 *db) {
-	char *zErrMsg = 0;
-	char sql[1024];
-	uint64_t i; //XXX
-
-	sprintf(sql, "INSERT INTO rainbow VALUES (%ld, \"%lx\");", i, i);
-	int rc = sqlite3_exec(db, sql, NULL, 0, &zErrMsg);
-	if( rc!=SQLITE_OK ){
-		fprintf(stderr, "SQL error: %s\n", zErrMsg);
-		sqlite3_free(zErrMsg);
-	}
-}
-
-int main(int argc, char **argv){
+int main(int argc, char **argv) {
 	sqlite3 *db;
 	char *zErrMsg = 0;
 	int rc;
@@ -58,7 +54,41 @@ int main(int argc, char **argv){
 	}
 
 	std::thread hasherThread(hasher);
-	std::thread dberThread(dber(db));
+
+	while (true) {
+		while(queue.size() < 10) {
+			std::this_thread::sleep_for(std::chrono::microseconds(100));
+			if (hasherThread.joinable()) break;
+		}
+		if (hasherThread.joinable()) break;
+		sprintf(sql, "INSERT INTO rainbow VALUES");
+		queue.pop_front();
+		hash h = queue.front();
+		sprintf(sql + strlen(sql), " (%ld, \"%s\"),", h.pin, h.hash);
+		h = queue.front();
+		sprintf(sql + strlen(sql), " (%ld, \"%s\"),", h.pin, h.hash);
+		h = queue.front();
+		sprintf(sql + strlen(sql), " (%ld, \"%s\"),", h.pin, h.hash);
+		h = queue.front();
+		sprintf(sql + strlen(sql), " (%ld, \"%s\"),", h.pin, h.hash);
+		h = queue.front();
+		sprintf(sql + strlen(sql), " (%ld, \"%s\"),", h.pin, h.hash);
+		h = queue.front();
+		sprintf(sql + strlen(sql), " (%ld, \"%s\"),", h.pin, h.hash);
+		h = queue.front();
+		sprintf(sql + strlen(sql), " (%ld, \"%s\"),", h.pin, h.hash);
+		h = queue.front();
+		sprintf(sql + strlen(sql), " (%ld, \"%s\"),", h.pin, h.hash);
+		h = queue.front();
+		sprintf(sql + strlen(sql), " (%ld, \"%s\"),", h.pin, h.hash);
+		h = queue.front();
+		sprintf(sql + strlen(sql), " (%ld, \"%s\");", h.pin, h.hash);
+		int rc = sqlite3_exec(db, sql, NULL, 0, &zErrMsg);
+		if( rc!=SQLITE_OK ){
+			fprintf(stderr, "SQL error: %s\n", zErrMsg);
+			sqlite3_free(zErrMsg);
+		}
+	}
 
 	sqlite3_close(db);
 	return 0;

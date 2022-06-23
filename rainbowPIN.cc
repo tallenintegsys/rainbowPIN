@@ -4,23 +4,37 @@
 #include <thread>
 #include <deque>
 #include <cstring>
+#include <openssl/evp.h>
 
 // per the SQLite docs, "Threads are evil. Avoid them."
 // PRAGMA synchronous=OFF don't wait for fflush
 // INTEGER PRIMARY KEY the PIN 
 typedef struct {
-	char		pin[16];
-	char		hash[64];
+	uint8_t		pin[10];
+	uint8_t		hash[32];
 } hash;
 
 std::deque<hash> queue;
 
 void hasher(void) {
 	hash h;
+	unsigned int len = 0;
+
+	EVP_MD_CTX *ctx = EVP_MD_CTX_new();
+	EVP_MD *sha256 = EVP_MD_fetch(NULL, "SHA256", NULL);
+
 	for (uint32_t i = 0; i < 9996; i++) {
-		sprintf(h.pin, "%9.9u", i);
-		sprintf(h.hash, "1234567890123456789012345678901"); //XXX BS placeholder
+		sprintf((char *)h.pin, "%9.9u", i);
+		EVP_DigestInit_ex(ctx, sha256, NULL);
+		EVP_DigestUpdate(ctx, h.pin, 9);
+		EVP_DigestFinal_ex(ctx, h.hash, &len);
 		queue.push_back(h);
+		/*
+		printf("%s, ", h.pin);
+		for (int i = 0; i < 32; i++)
+			printf("%2.2x", h.hash[i]);
+		printf("\n");
+		*/
 	}
 }
 

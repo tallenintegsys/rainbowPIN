@@ -1,5 +1,5 @@
 CFLAGS= -g
-CXXFLAGS= -g
+CXXFLAGS= -g -Wall -pedantic
 LDFLAGS= -lsqlite3 -lcrypto
 
 %: %.c

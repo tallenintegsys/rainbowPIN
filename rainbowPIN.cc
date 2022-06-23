@@ -17,7 +17,7 @@ std::deque<hash> queue;
 
 void hasher(void) {
 	hash h;
-	for (uint64_t i = 0; i < 9999; i += 10) {
+	for (uint64_t i = 0; i < 10000; i++) {
 		h.pin = i;
 		sprintf(h.hash, "1234567890123456789012345678901"); //XXX BS placeholder
 		queue.push_back(h);
@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
 	sqlite3 *db;
 	char *zErrMsg = 0;
 	int rc;
-	char sql[1024];
+	char sql[16384];
 
 	if( argc!=2 ){
 		fprintf(stderr, "Usage: %s file.db\n", argv[0]);
@@ -55,39 +55,56 @@ int main(int argc, char **argv) {
 
 	std::thread hasherThread(hasher);
 
+	uint8_t count = 0;
 	while (true) {
-		while(queue.size() < 10) {
+		if (queue.size() < 10) {
 			std::this_thread::sleep_for(std::chrono::microseconds(100));
-			if (hasherThread.joinable()) break;
+			if (++count) 
+				continue;
+			break;
 		}
-		if (hasherThread.joinable()) break;
 		sprintf(sql, "INSERT INTO rainbow VALUES");
-		queue.pop_front();
 		hash h = queue.front();
 		sprintf(sql + strlen(sql), " (%ld, \"%s\"),", h.pin, h.hash);
+		queue.pop_front();
 		h = queue.front();
 		sprintf(sql + strlen(sql), " (%ld, \"%s\"),", h.pin, h.hash);
+		queue.pop_front();
 		h = queue.front();
 		sprintf(sql + strlen(sql), " (%ld, \"%s\"),", h.pin, h.hash);
+		queue.pop_front();
 		h = queue.front();
 		sprintf(sql + strlen(sql), " (%ld, \"%s\"),", h.pin, h.hash);
+		queue.pop_front();
 		h = queue.front();
 		sprintf(sql + strlen(sql), " (%ld, \"%s\"),", h.pin, h.hash);
+		queue.pop_front();
 		h = queue.front();
 		sprintf(sql + strlen(sql), " (%ld, \"%s\"),", h.pin, h.hash);
+		queue.pop_front();
 		h = queue.front();
 		sprintf(sql + strlen(sql), " (%ld, \"%s\"),", h.pin, h.hash);
+		queue.pop_front();
 		h = queue.front();
 		sprintf(sql + strlen(sql), " (%ld, \"%s\"),", h.pin, h.hash);
+		queue.pop_front();
 		h = queue.front();
 		sprintf(sql + strlen(sql), " (%ld, \"%s\"),", h.pin, h.hash);
+		queue.pop_front();
 		h = queue.front();
+		queue.pop_front();
 		sprintf(sql + strlen(sql), " (%ld, \"%s\");", h.pin, h.hash);
 		int rc = sqlite3_exec(db, sql, NULL, 0, &zErrMsg);
 		if( rc!=SQLITE_OK ){
 			fprintf(stderr, "SQL error: %s\n", zErrMsg);
 			sqlite3_free(zErrMsg);
 		}
+	}
+	hasherThread.join();
+	while (queue.size()) {	// empty the queue
+		queue.pop_front();
+		hash h = queue.front();
+		sprintf(sql, "INSERT INTO rainbow VALUES (%ld, \"%s\"),", h.pin, h.hash);
 	}
 
 	sqlite3_close(db);

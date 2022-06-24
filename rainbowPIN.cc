@@ -1,32 +1,30 @@
-#include <stdio.h>
-#include <sqlite3.h>
-#include <stdint.h>
-#include <thread>
-#include <string>
-#include <iostream>
-#include <sstream>
-#include <queue>
 #include <cstring>
-#include <openssl/evp.h>
-#include <iostream>
 #include <iomanip>
-#include <string>
-#include <new>
+#include <iostream>
 #include <mutex>
+#include <new>
+#include <openssl/evp.h>
+#include <queue>
 #include <signal.h>
+#include <sqlite3.h>
+#include <sstream>
+#include <stdint.h>
+#include <stdio.h>
+#include <string>
+#include <thread>
 
 // per the SQLite docs, "Threads are evil. Avoid them."
 // PRAGMA synchronous=OFF don't wait for fflush
-// INTEGER PRIMARY KEY the PIN 
+// INTEGER PRIMARY KEY the PIN
 struct Hash {
-	uint8_t		pin[10];
-	uint8_t		hash[EVP_MAX_MD_SIZE];
-	friend std::stringstream& operator<< (std::stringstream &ss, const Hash &h);
+	uint8_t pin[10];
+	uint8_t hash[EVP_MAX_MD_SIZE];
+	friend std::stringstream &operator<<(std::stringstream &ss, const Hash &h);
 };
 
-std::stringstream& operator<< (std::stringstream &ss, const Hash &h) {
+std::stringstream &operator<<(std::stringstream &ss, const Hash &h) {
 	ss << "(\"";
-    ss << h.pin[0] << h.pin[1] << h.pin[2] << h.pin[3] << h.pin[4] << h.pin[5] << h.pin[6] << h.pin[7] << h.pin[8];
+	ss << h.pin[0] << h.pin[1] << h.pin[2] << h.pin[3] << h.pin[4] << h.pin[5] << h.pin[6] << h.pin[7] << h.pin[8];
 	ss << "\", \"" << std::hex;
 	ss << std::setw(2) << std::setfill('0') << (int)h.hash[0] << std::setw(2) << std::setfill('0') << (int)h.hash[1];
 	ss << std::setw(2) << std::setfill('0') << (int)h.hash[2] << std::setw(2) << std::setfill('0') << (int)h.hash[3];
@@ -45,7 +43,7 @@ std::stringstream& operator<< (std::stringstream &ss, const Hash &h) {
 	ss << std::setw(2) << std::setfill('0') << (int)h.hash[28] << std::setw(2) << std::setfill('0') << (int)h.hash[29];
 	ss << std::setw(2) << std::setfill('0') << (int)h.hash[30] << std::setw(2) << std::setfill('0') << (int)h.hash[31];
 	ss << "\")";
-	//std::cout << ss.str() << "\n";
+	//	std::cout << ss.str() << "\n";
 	return ss;
 };
 
@@ -61,23 +59,22 @@ void hasher(void) {
 
 	for (uint32_t i = 0; i < 999999999; i++) {
 		sprintf((char *)h.pin, "%9.9u", i);
-		//std::cout << h->pin << "\n";
+		//	std::cout << h->pin << "\n";
 		EVP_DigestInit_ex2(ctx, sha256, NULL);
 		EVP_DigestUpdate(ctx, h.pin, 9);
 		EVP_DigestFinal_ex(ctx, h.hash, &len);
 		qmutex.lock();
 		queue.emplace(h);
 		qmutex.unlock();
-		//std::cout << i << "\n";
+		//	std::cout << i << "\n";
 		while (queue.size() > 100) // idle stabilizer
 			std::this_thread::sleep_for(std::chrono::microseconds(1000));
 	}
 }
 
-void sigabort(int sig)
-{
+void sigabort(int sig) {
 	std::cerr << "queue size: " << queue.size() << std::endl;
-} 
+}
 
 int main(int argc, char **argv) {
 	sqlite3 *db;
@@ -87,27 +84,28 @@ int main(int argc, char **argv) {
 
 	signal(SIGABRT, sigabort);
 
-	if( argc!=2 ){
+	if (argc != 2) {
 		fprintf(stderr, "Usage: %s file.db\n", argv[0]);
-		return(1);
+		return (1);
 	}
 	rc = sqlite3_open(argv[1], &db);
-	if( rc ){
+	if (rc) {
 		fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
 		sqlite3_close(db);
-		return(1);
+		return (1);
 	}
-	sql  << "CREATE TABLE rainbow (pin VARCHAR(9), hash VARCHAR(32));\n";
-	sql  << "PRAGMA synchronous=OFF;\n";
+	sql << "CREATE TABLE rainbow (pin VARCHAR(9), hash VARCHAR(32));\n";
+	sql << "PRAGMA synchronous=OFF;\n";
 	rc = sqlite3_exec(db, sql.str().c_str(), NULL, 0, &zErrMsg);
-	if( rc!=SQLITE_OK ){
+	if (rc != SQLITE_OK) {
 		std::cerr << "SQL error: " << zErrMsg << "\n";
 		sqlite3_free(zErrMsg);
 	}
-	//std::cout << sql.str();
+	//	std::cout << sql.str();
 
 	std::thread hasherThread(hasher);
-	while (queue.size() < 10);
+	while (queue.size() < 10)
+		;
 
 	bool run = 1;
 	while (run) {
@@ -146,9 +144,9 @@ int main(int argc, char **argv) {
 		sql << h << ";\n";
 		queue.pop();
 		qmutex.unlock();
-		//std::cout << sql.str() << "\n";
+		//	std::cout << sql.str() << "\n";
 		rc = sqlite3_exec(db, sql.str().c_str(), NULL, 0, &zErrMsg);
-		if( rc!=SQLITE_OK ){
+		if (rc != SQLITE_OK) {
 			std::cerr << "SQL error: " << zErrMsg << "\n";
 			sqlite3_free(zErrMsg);
 		}
@@ -161,15 +159,15 @@ int main(int argc, char **argv) {
 		}
 	}
 	hasherThread.join();
-	while (queue.size()) {	// empty the queue
+	while (queue.size()) { // empty the queue
 		sql.str("");
 		Hash h = queue.front();
 		sql << "INSERT INTO rainbow VALUES ";
 		sql << h << ";\n";
 		queue.pop();
-		//std::cout << sql.str() << "\n";
+		//	std::cout << sql.str() << "\n";
 		rc = sqlite3_exec(db, sql.str().c_str(), NULL, 0, &zErrMsg);
-		if( rc!=SQLITE_OK ){
+		if (rc != SQLITE_OK) {
 			fprintf(stderr, "SQL error: %s\n", zErrMsg);
 			sqlite3_free(zErrMsg);
 		}

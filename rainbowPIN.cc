@@ -12,6 +12,7 @@
 #include <iomanip>
 #include <string>
 #include <new>
+#include <mutex>
 
 // per the SQLite docs, "Threads are evil. Avoid them."
 // PRAGMA synchronous=OFF don't wait for fflush
@@ -47,6 +48,7 @@ std::stringstream& operator<< (std::stringstream &ss, const Hash &h) {
 	return ss;
 };
 
+std::mutex qmutex;
 std::queue<Hash> queue;
 
 void hasher(void) {
@@ -62,7 +64,9 @@ void hasher(void) {
 		EVP_DigestInit_ex(ctx, sha256, NULL);
 		EVP_DigestUpdate(ctx, h.pin, 9);
 		EVP_DigestFinal_ex(ctx, h.hash, &len);
+		qmutex.lock();
 		queue.emplace(h);
+		qmutex.unlock();
 		//std::cout << i << "\n";
 	}
 }
@@ -83,7 +87,7 @@ int main(int argc, char **argv) {
 		sqlite3_close(db);
 		return(1);
 	}
-	sql  << "CREATE TABLE rainbow (pin VARCHAR(9), hash VARCHAR);\n";
+	sql  << "CREATE TABLE rainbow (pin VARCHAR(9), hash VARCHAR(32));\n";
 	sql  << "PRAGMA synchronous=OFF;\n";
 	rc = sqlite3_exec(db, sql.str().c_str(), NULL, 0, &zErrMsg);
 	if( rc!=SQLITE_OK ){
@@ -100,6 +104,7 @@ int main(int argc, char **argv) {
 		uint8_t count = 0;
 		sql.str("");
 		sql << "INSERT INTO rainbow VALUES ";
+		qmutex.lock();
 		Hash h = queue.front();
 		sql << h << ", \n";
 		queue.pop();
@@ -130,6 +135,7 @@ int main(int argc, char **argv) {
 		h = queue.front();
 		sql << h << ";\n";
 		queue.pop();
+		qmutex.unlock();
 		//std::cout << sql.str() << "\n";
 		rc = sqlite3_exec(db, sql.str().c_str(), NULL, 0, &zErrMsg);
 		if( rc!=SQLITE_OK ){

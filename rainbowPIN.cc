@@ -16,19 +16,15 @@
 // per the SQLite docs, "Threads are evil. Avoid them."
 // PRAGMA synchronous=OFF don't wait for fflush
 // INTEGER PRIMARY KEY the PIN 
-class Hash {
-	public:
-		Hash() {
-			std::cout << "Hash constructed \n";
-		};
-		uint8_t		pin[10];
-		uint8_t		hash[32];
-		friend std::stringstream& operator<< (std::stringstream &ss, const Hash &h);
+struct Hash {
+	uint8_t		pin[10];
+	uint8_t		hash[32];
+	friend std::stringstream& operator<< (std::stringstream &ss, const Hash &h);
 };
 
 std::stringstream& operator<< (std::stringstream &ss, const Hash &h) {
 	ss << "(\"";
-    ss << h.pin[0] << h.pin[1] << h.pin[2] << h.pin[3] << h.pin[4] << h.pin[5] << h.pin[6] << h.pin[7] << h.pin[8] << h.pin[9];
+    ss << h.pin[0] << h.pin[1] << h.pin[2] << h.pin[3] << h.pin[4] << h.pin[5] << h.pin[6] << h.pin[7] << h.pin[8];
 	ss << "\", \"" << std::hex;
 	ss << std::setw(2) << std::setfill('0') << (int)h.hash[0] << std::setw(2) << std::setfill('0') << (int)h.hash[1];
 	ss << std::setw(2) << std::setfill('0') << (int)h.hash[2] << std::setw(2) << std::setfill('0') << (int)h.hash[3];
@@ -47,7 +43,7 @@ std::stringstream& operator<< (std::stringstream &ss, const Hash &h) {
 	ss << std::setw(2) << std::setfill('0') << (int)h.hash[28] << std::setw(2) << std::setfill('0') << (int)h.hash[29];
 	ss << std::setw(2) << std::setfill('0') << (int)h.hash[30] << std::setw(2) << std::setfill('0') << (int)h.hash[31];
 	ss << "\")";
-	std::cout << ss.str() << "\n";
+	//std::cout << ss.str() << "\n";
 	return ss;
 };
 
@@ -60,7 +56,7 @@ void hasher(void) {
 	EVP_MD_CTX *ctx = EVP_MD_CTX_new();
 	EVP_MD *sha256 = EVP_MD_fetch(NULL, "SHA256", NULL);
 
-	for (uint32_t i = 0; i < 1000000000; i++) {
+	for (uint32_t i = 0; i < 999999999; i++) {
 		sprintf((char *)h.pin, "%9.9u", i);
 		//std::cout << h->pin << "\n";
 		EVP_DigestInit_ex(ctx, sha256, NULL);
@@ -105,34 +101,34 @@ int main(int argc, char **argv) {
 		sql.str("");
 		sql << "INSERT INTO rainbow VALUES ";
 		Hash h = queue.front();
-		sql << h << ", ";
+		sql << h << ", \n";
 		queue.pop();
 		h = queue.front();
-		sql << h << ", ";
+		sql << h << ", \n";
 		queue.pop();
 		h = queue.front();
-		sql << h << ", ";
+		sql << h << ", \n";
 		queue.pop();
 		h = queue.front();
-		sql << h << ", ";
+		sql << h << ", \n";
 		queue.pop();
 		h = queue.front();
-		sql << h << ", ";
+		sql << h << ", \n";
 		queue.pop();
 		h = queue.front();
-		sql << h << ", ";
+		sql << h << ", \n";
 		queue.pop();
 		h = queue.front();
-		sql << h << ", ";
+		sql << h << ", \n";
 		queue.pop();
 		h = queue.front();
-		sql << h << ", ";
+		sql << h << ", \n";
 		queue.pop();
 		h = queue.front();
-		sql << h << ", ";
+		sql << h << ", \n";
 		queue.pop();
 		h = queue.front();
-		sql << h << ";";
+		sql << h << ";\n";
 		queue.pop();
 		//std::cout << sql.str() << "\n";
 		rc = sqlite3_exec(db, sql.str().c_str(), NULL, 0, &zErrMsg);
@@ -153,7 +149,7 @@ int main(int argc, char **argv) {
 		sql.str("");
 		Hash h = queue.front();
 		sql << "INSERT INTO rainbow VALUES ";
-		sql << h << ";";
+		sql << h << ";\n";
 		queue.pop();
 		//std::cout << sql.str() << "\n";
 		rc = sqlite3_exec(db, sql.str().c_str(), NULL, 0, &zErrMsg);

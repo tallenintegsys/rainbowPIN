@@ -13,13 +13,14 @@
 #include <string>
 #include <new>
 #include <mutex>
+#include <signal.h>
 
 // per the SQLite docs, "Threads are evil. Avoid them."
 // PRAGMA synchronous=OFF don't wait for fflush
 // INTEGER PRIMARY KEY the PIN 
 struct Hash {
 	uint8_t		pin[10];
-	uint8_t		hash[32];
+	uint8_t		hash[EVP_MAX_MD_SIZE];
 	friend std::stringstream& operator<< (std::stringstream &ss, const Hash &h);
 };
 
@@ -61,21 +62,30 @@ void hasher(void) {
 	for (uint32_t i = 0; i < 999999999; i++) {
 		sprintf((char *)h.pin, "%9.9u", i);
 		//std::cout << h->pin << "\n";
-		EVP_DigestInit_ex(ctx, sha256, NULL);
+		EVP_DigestInit_ex2(ctx, sha256, NULL);
 		EVP_DigestUpdate(ctx, h.pin, 9);
 		EVP_DigestFinal_ex(ctx, h.hash, &len);
 		qmutex.lock();
 		queue.emplace(h);
 		qmutex.unlock();
 		//std::cout << i << "\n";
+		while (queue.size() > 100) // idle stabilizer
+			std::this_thread::sleep_for(std::chrono::microseconds(1000));
 	}
 }
+
+void sigabort(int sig)
+{
+	std::cerr << "queue size: " << queue.size() << std::endl;
+} 
 
 int main(int argc, char **argv) {
 	sqlite3 *db;
 	char *zErrMsg = 0;
 	int rc;
 	std::stringstream sql;
+
+	signal(SIGABRT, sigabort);
 
 	if( argc!=2 ){
 		fprintf(stderr, "Usage: %s file.db\n", argv[0]);
@@ -139,11 +149,11 @@ int main(int argc, char **argv) {
 		//std::cout << sql.str() << "\n";
 		rc = sqlite3_exec(db, sql.str().c_str(), NULL, 0, &zErrMsg);
 		if( rc!=SQLITE_OK ){
-//			std::cerr << "SQL error: " << zErrMsg << "\n";
+			std::cerr << "SQL error: " << zErrMsg << "\n";
 			sqlite3_free(zErrMsg);
 		}
 		while (queue.size() < 10) {
-			std::this_thread::sleep_for(std::chrono::microseconds(1000));
+			std::this_thread::sleep_for(std::chrono::microseconds(10000));
 			if (!++count) {
 				run = 0;
 				break;

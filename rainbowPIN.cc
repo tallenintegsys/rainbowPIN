@@ -55,7 +55,7 @@ void hasher(void) {
 	EVP_MD_CTX *ctx = EVP_MD_CTX_new();
 	EVP_MD *sha256 = EVP_MD_fetch(NULL, "SHA256", NULL);
 
-	for (uint32_t i = 0; i < 16; i++) {
+	for (uint32_t i = 0; i < 1000000000; i++) {
 		sprintf((char *)h.pin, "%9.9u", i);
 		EVP_DigestInit_ex(ctx, sha256, NULL);
 		EVP_DigestUpdate(ctx, h.pin, 9);

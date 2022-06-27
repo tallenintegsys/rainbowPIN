@@ -42,12 +42,13 @@ int main(int argc, char **argv) {
 	}
 	//std::cout << sql.str();
 
-	char pin[10];
+	char pin[11];
 	uint8_t hash[64];
 	unsigned int len = 0;
 
 	EVP_MD_CTX *ctx = EVP_MD_CTX_new();
-	EVP_MD *sha256 = EVP_MD_fetch(NULL, "SHA256", NULL);
+	//EVP_MD *sha256 = EVP_MD_fetch(NULL, "SHA256", NULL);
+	const EVP_MD *sha256 = EVP_sha1();
 
 	for (uint32_t i = 0; i < 1000000000; i++) {
 		sql.str("");

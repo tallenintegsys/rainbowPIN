@@ -8,7 +8,7 @@ LDFLAGS= -lsqlite3 -lcrypto
 %: %.cc
 	$(CXX) -o $@ $^ $(LIBS) $(CXXFLAGS) $(LDFLAGS)
 
-all: rainbowPIN sha256
+all: rainbowPIN
 
 rainbowPIN:
 

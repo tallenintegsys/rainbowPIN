@@ -45,7 +45,7 @@ std::stringstream &operator<<(std::stringstream &ss, const Hash &h) {
 	ss << "\")";
 	//	std::cout << ss.str() << "\n";
 	return ss;
-};
+}
 
 std::mutex qmutex;
 std::queue<Hash> queue;
@@ -54,13 +54,17 @@ void hasher(void) {
 	Hash h;
 	unsigned int len = 0;
 
+	const EVP_MD *md = EVP_get_digestbyname("SHA256");
+	if (md == NULL) {
+		std::cerr << "Unknown message digest SHA256\n";
+		exit(1);
+	}
 	EVP_MD_CTX *ctx = EVP_MD_CTX_new();
-	EVP_MD *sha256 = EVP_MD_fetch(NULL, "SHA256", NULL);
-
+	EVP_DigestInit_ex(ctx, md, NULL);
 	for (uint32_t i = 0; i < 999999999; i++) {
 		sprintf((char *)h.pin, "%9.9u", i);
 		//	std::cout << h->pin << "\n";
-		EVP_DigestInit_ex2(ctx, sha256, NULL);
+		EVP_DigestInit_ex(ctx, md, NULL);
 		EVP_DigestUpdate(ctx, h.pin, 9);
 		EVP_DigestFinal_ex(ctx, h.hash, &len);
 		qmutex.lock();
@@ -85,12 +89,12 @@ int main(int argc, char **argv) {
 	signal(SIGABRT, sigabort);
 
 	if (argc != 2) {
-		fprintf(stderr, "Usage: %s file.db\n", argv[0]);
+		std::cerr << "Usage: " << argv[0] << "file.db\n";
 		return (1);
 	}
 	rc = sqlite3_open(argv[1], &db);
 	if (rc) {
-		fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
+		std::cerr << "Can't open database: " << sqlite3_errmsg(db) << "\n";
 		sqlite3_close(db);
 		return (1);
 	}
@@ -107,9 +111,14 @@ int main(int argc, char **argv) {
 	while (queue.size() < 10)
 		;
 
-	bool run = 1;
+	bool run = true;
+	uint8_t emptyQueueCount = 0;
+	uint32_t count = 0;
 	while (run) {
-		uint8_t count = 0;
+		if (count++ == 1000) {
+			count = 0;
+			std::cout << queue.size() << "\n";
+		}
 		sql.str("");
 		sql << "INSERT INTO rainbow VALUES ";
 		qmutex.lock();
@@ -150,14 +159,13 @@ int main(int argc, char **argv) {
 			std::cerr << "SQL error: " << zErrMsg << "\n";
 			sqlite3_free(zErrMsg);
 		}
-		while (queue.size() < 10) {
-			std::this_thread::sleep_for(std::chrono::microseconds(10000));
-			if (!++count) {
-				run = 0;
-				break;
+		if (queue.size() < 10) {
+			std::this_thread::sleep_for(std::chrono::microseconds(1000));
+			if (!++emptyQueueCount) {
+				run = false;
 			}
 		}
-	}
+	} // while
 	hasherThread.join();
 	while (queue.size()) { // empty the queue
 		sql.str("");

@@ -1,5 +1,5 @@
 CFLAGS= -g
-CXXFLAGS= -g -std=c++2a -Wall -pedantic
+CXXFLAGS= -g -std=gnu++23 -Wall -Wextra -pedantic
 LDFLAGS= -lsqlite3 -lcrypto
 
 %: %.c

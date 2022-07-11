@@ -68,7 +68,7 @@ void hasher(void) {
 		EVP_DigestUpdate(ctx, h.pin, 9);
 		EVP_DigestFinal_ex(ctx, h.hash, &len);
 		qmutex.lock();
-		queue.emplace(h);
+		queue.push(h);
 		qmutex.unlock();
 		//	std::cout << i << "\n";
 		while (queue.size() > 100) // idle stabilizer
@@ -77,7 +77,7 @@ void hasher(void) {
 }
 
 void sigabort(int sig) {
-	std::cerr << "queue size: " << queue.size() << std::endl;
+	std::cerr << "received sig " << sig << ", queue size: " << queue.size() << std::endl;
 }
 
 int main(int argc, char **argv) {
@@ -112,45 +112,17 @@ int main(int argc, char **argv) {
 		;
 
 	bool run = true;
-	uint8_t emptyQueueCount = 0;
-	uint32_t count = 0;
-	while (run) {
-		if (count++ == 1000) {
-			count = 0;
-			std::cout << queue.size() << "\n";
-		}
+	uint32_t emptyQueueCount = 0;
+	while (run == true) {
+		emptyQueueCount = 0;
 		sql.str("");
 		sql << "INSERT INTO rainbow VALUES ";
 		qmutex.lock();
-		Hash h = queue.front();
-		sql << h << ", \n";
-		queue.pop();
-		h = queue.front();
-		sql << h << ", \n";
-		queue.pop();
-		h = queue.front();
-		sql << h << ", \n";
-		queue.pop();
-		h = queue.front();
-		sql << h << ", \n";
-		queue.pop();
-		h = queue.front();
-		sql << h << ", \n";
-		queue.pop();
-		h = queue.front();
-		sql << h << ", \n";
-		queue.pop();
-		h = queue.front();
-		sql << h << ", \n";
-		queue.pop();
-		h = queue.front();
-		sql << h << ", \n";
-		queue.pop();
-		h = queue.front();
-		sql << h << ", \n";
-		queue.pop();
-		h = queue.front();
-		sql << h << ";\n";
+		for (int i = 0; i<9; i++) {
+			sql << queue.front() << ", \n";
+			queue.pop();
+		}
+		sql << queue.front() << " \n";
 		queue.pop();
 		qmutex.unlock();
 		//	std::cout << sql.str() << "\n";
@@ -159,12 +131,19 @@ int main(int argc, char **argv) {
 			std::cerr << "SQL error: " << zErrMsg << "\n";
 			sqlite3_free(zErrMsg);
 		}
-		if (queue.size() < 10) {
-			std::this_thread::sleep_for(std::chrono::microseconds(1000));
-			if (!++emptyQueueCount) {
+		qmutex.lock();
+		while (queue.size() < 10) {
+			qmutex.unlock();
+			std::cerr << "queue empty\n";
+			std::this_thread::sleep_for(std::chrono::microseconds(10000));
+			emptyQueueCount++;
+			if (emptyQueueCount == 65535) {
 				run = false;
+				break;
 			}
+			qmutex.lock();
 		}
+		qmutex.unlock();
 	} // while
 	hasherThread.join();
 	while (queue.size()) { // empty the queue

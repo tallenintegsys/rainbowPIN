@@ -14,6 +14,9 @@ rainbowPIN:
 
 sha256:
 
-.PHONY: clean
+.PHONY: clean lint
+lint: rainbowPIN
+	clang-tidy -checks=cert-* --warnings-as-errors=* $(^).cc
+
 clean:
 	rm -rf rainbowPIN sha256

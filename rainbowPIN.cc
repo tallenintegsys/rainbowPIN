@@ -50,9 +50,10 @@ std::stringstream &operator<<(std::stringstream &ss, const Hash &h) {
 std::mutex qmutex;
 std::queue<Hash> queue;
 
-void hasher(void) {
+void hasher(uint32_t start, uint32_t end) {
 	Hash h;
 	unsigned int len = 0;
+	size_t qsize = 0;
 
 	const EVP_MD *md = EVP_get_digestbyname("SHA256");
 	if (md == NULL) {
@@ -61,18 +62,20 @@ void hasher(void) {
 	}
 	EVP_MD_CTX *ctx = EVP_MD_CTX_new();
 	EVP_DigestInit_ex(ctx, md, NULL);
-	for (uint32_t i = 0; i < 999999999; i++) {
-		sprintf((char *)h.pin, "%9.9u", i);
+	for (uint32_t i = start; i < end; i++) {
+		(void)sprintf((char *)h.pin, "%9.9u", i);
 		//	std::cout << h->pin << "\n";
 		EVP_DigestInit_ex(ctx, md, NULL);
 		EVP_DigestUpdate(ctx, h.pin, 9);
 		EVP_DigestFinal_ex(ctx, h.hash, &len);
 		qmutex.lock();
 		queue.push(h);
+		qsize = queue.size();
 		qmutex.unlock();
-		//	std::cout << i << "\n";
-		while (queue.size() > 100) // idle stabilizer
+		if (qsize > 100000) {
 			std::this_thread::sleep_for(std::chrono::microseconds(1000));
+		}
+
 	}
 }
 
@@ -86,7 +89,7 @@ int main(int argc, char **argv) {
 	int rc;
 	std::stringstream sql;
 
-	signal(SIGABRT, sigabort);
+	(void)signal(SIGABRT, sigabort);
 
 	if (argc != 2) {
 		std::cerr << "Usage: " << argv[0] << "file.db\n";
@@ -107,9 +110,9 @@ int main(int argc, char **argv) {
 	}
 	//	std::cout << sql.str();
 
-	std::thread hasherThread(hasher);
-	while (queue.size() < 10)
-		;
+	std::thread hasherThread1(hasher, 0, 499999999);
+	std::thread hasherThread2(hasher, 500000000, 999999999);
+	std::this_thread::sleep_for(std::chrono::microseconds(10000));
 
 	bool run = true;
 	uint32_t emptyQueueCount = 0;
@@ -145,7 +148,8 @@ int main(int argc, char **argv) {
 		}
 		qmutex.unlock();
 	} // while
-	hasherThread.join();
+	hasherThread1.join();
+	hasherThread2.join();
 	while (queue.size()) { // empty the queue
 		sql.str("");
 		Hash h = queue.front();
@@ -155,7 +159,7 @@ int main(int argc, char **argv) {
 		//	std::cout << sql.str() << "\n";
 		rc = sqlite3_exec(db, sql.str().c_str(), NULL, 0, &zErrMsg);
 		if (rc != SQLITE_OK) {
-			fprintf(stderr, "SQL error: %s\n", zErrMsg);
+			(void)fprintf(stderr, "SQL error: %s\n", zErrMsg);
 			sqlite3_free(zErrMsg);
 		}
 	}

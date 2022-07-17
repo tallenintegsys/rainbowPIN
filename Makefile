@@ -1,6 +1,6 @@
 CFLAGS= -g
 CXXFLAGS= -g -std=c++2a -Wall -pedantic
-LDFLAGS= -lsqlite3 -lcrypto
+LDFLAGS= -lsqlite3 -lssl -lcrypto -lpthread
 
 %: %.c
 	$(CC) -o $@ $^ $(LIBS) $(CFLAGS) $(LDFLAGS)
@@ -8,7 +8,7 @@ LDFLAGS= -lsqlite3 -lcrypto
 %: %.cc
 	$(CXX) -o $@ $^ $(LIBS) $(CXXFLAGS) $(LDFLAGS)
 
-all: rainbowPIN sha256
+all: rainbowPIN
 
 rainbowPIN:
 

@@ -3,7 +3,7 @@
 #include <iostream>
 #include <mutex>
 #include <new>
-#include <openssl/evp.h>
+#include <openssl/sha.h>
 #include <queue>
 #include <signal.h>
 #include <sqlite3.h>
@@ -18,7 +18,7 @@
 // INTEGER PRIMARY KEY the PIN
 struct Hash {
 	uint8_t pin[10];
-	uint8_t hash[EVP_MAX_MD_SIZE];
+	uint8_t hash[SHA256_DIGEST_LENGTH];
 	friend std::stringstream &operator<<(std::stringstream &ss, const Hash &h);
 };
 
@@ -52,26 +52,18 @@ std::queue<Hash> queue;
 
 void hasher(void) {
 	Hash h;
-	unsigned int len = 0;
+   	SHA256_CTX ctx;
+    SHA256_Init(&ctx);
 
-	const EVP_MD *md = EVP_get_digestbyname("SHA256");
-	if (md == NULL) {
-		std::cerr << "Unknown message digest SHA256\n";
-		exit(1);
-	}
-	EVP_MD_CTX *ctx = EVP_MD_CTX_new();
-	EVP_DigestInit_ex(ctx, md, NULL);
 	for (uint32_t i = 0; i < 999999999; i++) {
 		sprintf((char *)h.pin, "%9.9u", i);
-		//	std::cout << h->pin << "\n";
-		EVP_DigestInit_ex(ctx, md, NULL);
-		EVP_DigestUpdate(ctx, h.pin, 9);
-		EVP_DigestFinal_ex(ctx, h.hash, &len);
+		SHA256_Update(&ctx, h.pin, 9);
+		SHA256_Final(h.hash, &ctx);
 		qmutex.lock();
-		queue.emplace(h);
+		queue.push(h);
 		qmutex.unlock();
 		//	std::cout << i << "\n";
-		while (queue.size() > 100) // idle stabilizer
+		while (queue.size() > 1000) // idle stabilizer
 			std::this_thread::sleep_for(std::chrono::microseconds(1000));
 	}
 }
@@ -164,8 +156,11 @@ int main(int argc, char **argv) {
 			if (!++emptyQueueCount) {
 				run = false;
 			}
+		} else {
+			emptyQueueCount = 0;
 		}
 	} // while
+	std::cerr << "finishing\n";
 	hasherThread.join();
 	while (queue.size()) { // empty the queue
 		sql.str("");

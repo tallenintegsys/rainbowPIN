@@ -50,12 +50,12 @@ std::stringstream &operator<<(std::stringstream &ss, const Hash &h) {
 std::mutex qmutex;
 std::queue<Hash> queue;
 
-void hasher(void) {
+void hasher(uint32_t start, uint32_t end) {
 	Hash h;
    	SHA256_CTX ctx;
     SHA256_Init(&ctx);
 
-	for (uint32_t i = 0; i < 999999999; i++) {
+	for (uint32_t i = start; i < end; i++) {
 		sprintf((char *)h.pin, "%9.9u", i);
 		SHA256_Update(&ctx, h.pin, 9);
 		SHA256_Final(h.hash, &ctx);
@@ -69,7 +69,7 @@ void hasher(void) {
 }
 
 void sigabort(int sig) {
-	std::cerr << "queue size: " << queue.size() << std::endl;
+	std::cerr << "received sig " << sig << ", queue size: " << queue.size() << std::endl;
 }
 
 int main(int argc, char **argv) {
@@ -78,7 +78,7 @@ int main(int argc, char **argv) {
 	int rc;
 	std::stringstream sql;
 
-	signal(SIGABRT, sigabort);
+	(void)signal(SIGABRT, sigabort);
 
 	if (argc != 2) {
 		std::cerr << "Usage: " << argv[0] << "file.db\n";
@@ -99,50 +99,20 @@ int main(int argc, char **argv) {
 	}
 	//	std::cout << sql.str();
 
-	std::thread hasherThread(hasher);
-	while (queue.size() < 10)
-		;
+	std::thread hasherThread1(hasher, 0, 499999999);
+	std::thread hasherThread2(hasher, 500000000, 999999999);
+	std::this_thread::sleep_for(std::chrono::microseconds(10000));
 
 	bool run = true;
-	uint8_t emptyQueueCount = 0;
-	uint32_t count = 0;
-	while (run) {
-		if (count++ == 1000) {
-			count = 0;
-			std::cout << queue.size() << "\n";
-		}
+	while (run == true) {
 		sql.str("");
 		sql << "INSERT INTO rainbow VALUES ";
 		qmutex.lock();
-		Hash h = queue.front();
-		sql << h << ", \n";
-		queue.pop();
-		h = queue.front();
-		sql << h << ", \n";
-		queue.pop();
-		h = queue.front();
-		sql << h << ", \n";
-		queue.pop();
-		h = queue.front();
-		sql << h << ", \n";
-		queue.pop();
-		h = queue.front();
-		sql << h << ", \n";
-		queue.pop();
-		h = queue.front();
-		sql << h << ", \n";
-		queue.pop();
-		h = queue.front();
-		sql << h << ", \n";
-		queue.pop();
-		h = queue.front();
-		sql << h << ", \n";
-		queue.pop();
-		h = queue.front();
-		sql << h << ", \n";
-		queue.pop();
-		h = queue.front();
-		sql << h << ";\n";
+		for (int i = 0; i<9; i++) {
+			sql << queue.front() << ", \n";
+			queue.pop();
+		}
+		sql << queue.front() << " \n";
 		queue.pop();
 		qmutex.unlock();
 		//	std::cout << sql.str() << "\n";
@@ -151,17 +121,10 @@ int main(int argc, char **argv) {
 			std::cerr << "SQL error: " << zErrMsg << "\n";
 			sqlite3_free(zErrMsg);
 		}
-		if (queue.size() < 10) {
-			std::this_thread::sleep_for(std::chrono::microseconds(1000));
-			if (!++emptyQueueCount) {
-				run = false;
-			}
-		} else {
-			emptyQueueCount = 0;
-		}
 	} // while
-	std::cerr << "finishing\n";
-	hasherThread.join();
+
+	hasherThread1.join();
+	hasherThread2.join();
 	while (queue.size()) { // empty the queue
 		sql.str("");
 		Hash h = queue.front();
@@ -171,7 +134,7 @@ int main(int argc, char **argv) {
 		//	std::cout << sql.str() << "\n";
 		rc = sqlite3_exec(db, sql.str().c_str(), NULL, 0, &zErrMsg);
 		if (rc != SQLITE_OK) {
-			fprintf(stderr, "SQL error: %s\n", zErrMsg);
+			(void)fprintf(stderr, "SQL error: %s\n", zErrMsg);
 			sqlite3_free(zErrMsg);
 		}
 	}
